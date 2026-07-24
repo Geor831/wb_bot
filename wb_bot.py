@@ -5,20 +5,31 @@ import json
 import sys
 import traceback
 import time
+import os
 
 # ===== ВАШИ ДАННЫЕ =====
 VK_TOKEN = "vk1.a.wOAyfLk_ftARYpMVGdnWS1Gy7V0cUArWt_4MZvKZnGHInrstPt_y2dT5B14LjIsRis7OTLWD12LsEcNoPW-O_C8_zB0BfaA2zeW5OyamxxbzeD7VrIoAhsVwaPXmK6uBroTD6_2XnaGUzS_SW0l29QjUmmVgmczJfTQnhnk6l4WsdwFEXDrNawF9osrsjqdO5XHjjNTUSWmnAlpvyt4ouA"
 GROUP_ID = 228196102
+
+# Прокси (если нужен) — укажите в переменной окружения PROXY_URL, либо оставьте пустым
+PROXY_URL = os.environ.get("PROXY_URL", "")  # например, "http://user:pass@ip:port"
 # ======================================
 
 def fetch_with_retry(url, timeout=60, retries=3):
-    """Выполняет GET запрос с повторными попытками при таймауте (таймаут 60 сек)"""
+    """Выполняет GET запрос с повторными попытками через прокси (если указан)"""
+    proxies = {}
+    if PROXY_URL:
+        proxies = {"http": PROXY_URL, "https": PROXY_URL}
+        print(f"Используется прокси: {PROXY_URL}")
     for attempt in range(retries + 1):
         try:
             print(f"Запрос к {url} (попытка {attempt+1})")
-            response = requests.get(url, timeout=timeout, headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            })
+            response = requests.get(
+                url, 
+                timeout=timeout, 
+                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'},
+                proxies=proxies
+            )
             if response.status_code == 200:
                 return response
             else:
