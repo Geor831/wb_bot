@@ -4,7 +4,7 @@ import requests
 import json
 
 # ===== ВАШИ ДАННЫЕ (новый токен) =====
-VK_TOKEN = "vk1.a.wOAyfLk_ftARYpMVGdnWS1Gy7V0cUArWt_4MZvKZnGHInrstPt_y2dT5B14LjIsRis7OTLWD12LsEcNoPW-O_C8_zB0BfaA2zeW5OyamxxbzeD7VrIoAhsVwaPXmK6uBroTD6_2XnaGUzS_SW0l29QjUmmVgmczJfTQnhnk6l4WsdwFEXDrNawF9osrsjqdO5XHjjNTUSWmnAlpvyt4ouA"
+VK_TOKEN = "vk1.a.ImiBmT1KOgvOzJp4nknQ0iZRy9DSmbtIv8FheyPq2K3t4Z8cbpWoHarPFaN8RF_b8X8EC07nuXZ-TVio1YcFeJ_-_LX7MMCtEf5FGmjbn9dQMZk8wkGz3n8bdMj1CGzFoq4ctFCok7PCAIMmdjnVr_yjQgssdVCj8wguoOQP8ibYdIGLIO4WBPL_YVCrTBISMsVv-S6KD1NJDP3lgVM7Zg"
 GROUP_ID = 228196102
 # ======================================
 
