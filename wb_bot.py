@@ -3,10 +3,10 @@ from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 import requests
 import json
 
-# ===== ВАШИ ДАННЫЕ =====
-VK_TOKEN = "vk1.a.7Y36GRUm05bC_M1LIerMlh-D2Bxhsy_FKyXH5IegUNL-KSnO8ZnwW66YKCXu0TPbl3Di7j4OadVzM2xssg5zxWdspA2oeXwkQw0ntukuaiQHajCT2mmYkslpUlkiwU_VbjJk86Wm5wi1o2PtxCY2thGE26p7o0KhgGdRB_CqFKx4m7bqPPetaocQkDSzh5mqRad0UfAAVa-UcjmADRQ6ag"
+# ===== ВАШИ ДАННЫЕ (новый токен) =====
+VK_TOKEN = "vk1.a.wOAyfLk_ftARYpMVGdnWS1Gy7V0cUArWt_4MZvKZnGHInrstPt_y2dT5B14LjIsRis7OTLWD12LsEcNoPW-O_C8_zB0BfaA2zeW5OyamxxbzeD7VrIoAhsVwaPXmK6uBroTD6_2XnaGUzS_SW0l29QjUmmVgmczJfTQnhnk6l4WsdwFEXDrNawF9osrsjqdO5XHjjNTUSWmnAlpvyt4ouA"
 GROUP_ID = 228196102
-# =======================
+# ======================================
 
 def parse_wb_product(article):
     try:
