@@ -5,41 +5,28 @@ import json
 import sys
 import traceback
 import time
-import os
+from collections import Counter
+import re
 
 # ===== ВАШИ ДАННЫЕ =====
 VK_TOKEN = "vk1.a.wOAyfLk_ftARYpMVGdnWS1Gy7V0cUArWt_4MZvKZnGHInrstPt_y2dT5B14LjIsRis7OTLWD12LsEcNoPW-O_C8_zB0BfaA2zeW5OyamxxbzeD7VrIoAhsVwaPXmK6uBroTD6_2XnaGUzS_SW0l29QjUmmVgmczJfTQnhnk6l4WsdwFEXDrNawF9osrsjqdO5XHjjNTUSWmnAlpvyt4ouA"
 GROUP_ID = 228196102
-
-# Прокси (если нужен) — укажите в переменной окружения PROXY_URL, либо оставьте пустым
-PROXY_URL = os.environ.get("PROXY_URL", "")  # например, "http://user:pass@ip:port"
 # ======================================
 
-def fetch_with_retry(url, timeout=60, retries=3):
-    """Выполняет GET запрос с повторными попытками через прокси (если указан)"""
-    proxies = {}
-    if PROXY_URL:
-        proxies = {"http": PROXY_URL, "https": PROXY_URL}
-        print(f"Используется прокси: {PROXY_URL}")
+# Простой словарь позитивных и негативных слов (для бесплатного анализа)
+POSITIVE_WORDS = {"вкус", "качество", "хороший", "отлично", "рекомендую", "супер", "нравится", "класс", "лучший", "прекрасный", "растворяется", "удобно", "натуральный", "свежий"}
+NEGATIVE_WORDS = {"состав", "не соответствует", "жалко", "разочарован", "плохо", "ужас", "дорого", "мало", "не понравился", "не вкус", "кукуруза", "обман", "скрыли", "не хватает"}
+
+def fetch_with_retry(url, timeout=30, retries=3):
     for attempt in range(retries + 1):
         try:
-            print(f"Запрос к {url} (попытка {attempt+1})")
-            response = requests.get(
-                url, 
-                timeout=timeout, 
-                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'},
-                proxies=proxies
-            )
+            response = requests.get(url, timeout=timeout, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            })
             if response.status_code == 200:
                 return response
             else:
                 print(f"Ошибка HTTP {response.status_code}, попытка {attempt+1}")
-        except requests.exceptions.Timeout:
-            print(f"Таймаут ({timeout} сек), попытка {attempt+1} из {retries+1}")
-            if attempt < retries:
-                time.sleep(3)
-            else:
-                raise
         except Exception as e:
             print(f"Ошибка: {e}, попытка {attempt+1}")
             if attempt < retries:
@@ -47,6 +34,63 @@ def fetch_with_retry(url, timeout=60, retries=3):
             else:
                 raise
     return None
+
+def parse_reviews(article):
+    """Парсит отзывы с Wildberries через публичный эндпоинт"""
+    try:
+        url = f"https://feedbacks.wb.ru/api/v1/feedbacks?nmId={article}"
+        response = fetch_with_retry(url)
+        if not response:
+            return None
+        data = response.json()
+        if not data.get('feedbacks'):
+            return None
+        
+        reviews = []
+        ratings = []
+        for item in data['feedbacks']:
+            text = item.get('text', '')
+            valuation = item.get('productValuation', 0)
+            if text:
+                reviews.append(text.lower())
+                ratings.append(valuation)
+        
+        if not reviews:
+            return None
+        
+        # Средний рейтинг
+        avg_rating = sum(ratings) / len(ratings) if ratings else 0
+        
+        # Анализ частотности слов (простой, без AI)
+        all_text = " ".join(reviews)
+        words = re.findall(r'\b[а-яёa-z]+\b', all_text)
+        word_counts = Counter(words)
+        
+        # Убираем стоп-слова (служебные)
+        stop_words = {"и", "в", "на", "с", "по", "к", "у", "о", "от", "за", "из", "без", "для", "как", "что", "это", "очень", "был", "но", "только", "ещё", "уже", "все", "всё", "его", "её", "их", "ваш", "наш", "мой", "твой", "так", "вот", "да", "нет", "или", "где", "когда", "потом", "сейчас", "если", "чтобы", "пока", "ведь", "же", "ли", "бы"}
+        for word in stop_words:
+            if word in word_counts:
+                del word_counts[word]
+        
+        # Выделяем позитивные и негативные слова
+        positive_found = {}
+        negative_found = {}
+        for word, count in word_counts.most_common(30):
+            if word in POSITIVE_WORDS:
+                positive_found[word] = count
+            elif word in NEGATIVE_WORDS:
+                negative_found[word] = count
+        
+        return {
+            "total": len(reviews),
+            "avg_rating": round(avg_rating, 1),
+            "positive": dict(sorted(positive_found.items(), key=lambda x: x[1], reverse=True)[:5]),
+            "negative": dict(sorted(negative_found.items(), key=lambda x: x[1], reverse=True)[:5]),
+            "top_words": dict(word_counts.most_common(10))
+        }
+    except Exception as e:
+        print(f"Ошибка парсинга отзывов: {e}")
+        return None
 
 def parse_wb_product(article):
     try:
@@ -58,7 +102,6 @@ def parse_wb_product(article):
         if not detail_data.get('data', {}).get('products'):
             return None
         product = detail_data['data']['products'][0]
-        
         search_query = product.get('name', '').split('/')[0].strip()
         search_url = f"https://search.wb.ru/exactmatch/ru/common/v18/search?appType=1&curr=rub&lang=ru&page=1&query={search_query}&resultset=catalog&sort=popular&spp=30"
         search_response = fetch_with_retry(search_url)
@@ -82,12 +125,11 @@ def parse_wb_product(article):
                 "price": product.get('sizes', [{}])[0].get('price', {}).get('product', 0) / 100,
                 "rating": product.get('rating', 0),
                 "feedbacks": product.get('feedbacks', 0),
-                "seller": product.get('supplier', ''),
             },
             "competitors": competitors[:5]
         }
     except Exception as e:
-        print(f"Ошибка парсинга: {e}")
+        print(f"Ошибка парсинга товара: {e}")
         return None
 
 def analyze_product(product, competitors):
@@ -129,13 +171,47 @@ try:
                 text = event.obj.message['text'].strip()
                 
                 if text.lower() == "начать":
-                    send_msg(user_id, "👋 Привет! Я WB.Analytics — аналитик конкурентов.\nОтправь мне артикул товара, и я покажу его плюсы и минусы относительно рынка.\n\n📌 Команды:\n• артикул — анализ товара\n• помощь — список команд")
+                    send_msg(user_id, "👋 Привет! Я WB.Analytics — аналитик конкурентов.\n\n📌 Команды:\n• артикул — анализ товара (цена, конкуренты)\n• отзывы артикул — анализ отзывов\n• помощь — список команд")
                 
                 elif text.lower() == "помощь":
-                    send_msg(user_id, "📖 *Помощь по боту*\n\n1. Отправьте артикул Wildberries (число) — я проанализирую товар и конкурентов.\n2. Оценка: покажу, на сколько % ваш товар дороже/дешевле, выше/ниже рейтинг и т.д.\n3. Сильные и слабые стороны — определю автоматически.\n\nПример артикула: 157065568")
+                    send_msg(user_id, "📖 *Помощь по боту*\n\n1. Отправьте артикул (число) — анализ конкурентов.\n2. Напишите 'отзывы 123456789' — анализ отзывов.\n3. Пример артикула: 157065568")
+                
+                elif text.lower().startswith("отзывы") and len(text.split()) > 1:
+                    article = text.split()[1]
+                    if article.isdigit():
+                        send_msg(user_id, f"🔍 Собираю отзывы по артикулу {article}... ⏳ (до 20 секунд)")
+                        reviews_data = parse_reviews(article)
+                        if reviews_data:
+                            msg = f"📊 *Анализ отзывов (арт. {article})*\n"
+                            msg += f"📝 Всего отзывов: {reviews_data['total']}\n"
+                            msg += f"⭐ Средний рейтинг: {reviews_data['avg_rating']}\n\n"
+                            
+                            if reviews_data['positive']:
+                                msg += "✅ *Частые плюсы:*\n"
+                                for word, count in reviews_data['positive'].items():
+                                    msg += f"   • {word} — {count} раз(а)\n"
+                            else:
+                                msg += "✅ Явных плюсов не найдено.\n"
+                            
+                            if reviews_data['negative']:
+                                msg += "\n⚠️ *Частые минусы:*\n"
+                                for word, count in reviews_data['negative'].items():
+                                    msg += f"   • {word} — {count} раз(а)\n"
+                            else:
+                                msg += "\n⚠️ Явных минусов не найдено.\n"
+                            
+                            msg += f"\n📌 Топ-10 слов в отзывах:\n"
+                            for word, count in list(reviews_data['top_words'].items())[:10]:
+                                msg += f"   • {word} — {count}\n"
+                            
+                            send_msg(user_id, msg)
+                        else:
+                            send_msg(user_id, "❌ Не удалось загрузить отзывы. Проверьте артикул или попробуйте позже.")
+                    else:
+                        send_msg(user_id, "❌ Артикул должен быть числом. Пример: отзывы 61472739")
                 
                 elif text.isdigit():
-                    send_msg(user_id, f"🔍 Анализирую артикул {text}... ⏳ (может занять до минуты)")
+                    send_msg(user_id, f"🔍 Анализирую артикул {text}... ⏳")
                     data = parse_wb_product(text)
                     if data:
                         product = data['product']
